@@ -221,9 +221,11 @@ int main() {
                         //    break;
                         //}
                     case 6:
+                        refresh:
                         system("cls");
                         cout << "\n                           APPROVE BLOCKS                             \n";
                         cout << "------------------------------------------------------------------------\n";
+
                         if (node.view_pending_approvals() == true) {
                             cout << "\n..........................................................................\n";
                             cout << "\nEnter the Block ID you want to Approve or Enter 0 to Exit: ";
@@ -235,11 +237,16 @@ int main() {
                                 }
                                 if (node.approve_block(blocktoapprove) == true) {
                                     cout << "\nBlock Approved Successfully";
+                                    goto refresh;
                                 }
                                 else {
                                     cout << "\nInvalid Block ID! Press 0 to Exit";
                                 }
                             }
+                        }
+                        else {
+                            cout << "\nWooohoo! No Pending Approvals Yet.";
+                            cout << "\n..........................................................................\n";
                         }
                         cout << "\nPress Any Key to Go Back...";
                         if (getch()) {
@@ -273,7 +280,7 @@ int main() {
             cout << "Invalid choice. Please enter a valid option.\n";
             break;
         }
-    }
+    };
 
     return 0;
 }

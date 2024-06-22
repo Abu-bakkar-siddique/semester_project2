@@ -909,14 +909,22 @@ bool Node::view_pending_approvals() {
         return false;
     }
 
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-        // TODO : Print the block_id recieved and its approval status in a new line.
+    bool hasPendingApprovals = false;
 
-        int block_id = sqlite3_column_int(stmt, 0); // Get the block_id from the result
-        int approved = sqlite3_column_int(stmt, 1); // Get the approved status (0 or 1)
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        hasPendingApprovals = true; // Set the flag to true if at least one row is returned
+
+        // Get the block_id and approved status from the result
+        int block_id = sqlite3_column_int(stmt, 0);
+        int approved = sqlite3_column_int(stmt, 1);
 
         // Print the block_id and its approval status
         cout << "\nBlock ID: " << block_id << ", Approval Status: " << (approved ? "true" : "false");
+    }
+
+    // Check the flag after the loop
+    if (!hasPendingApprovals) {
+        cout << "Woohoo, No pending Approvals!";
     }
 
     if (rc != SQLITE_DONE) {
