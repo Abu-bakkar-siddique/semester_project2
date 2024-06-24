@@ -1,5 +1,5 @@
 #include "Node.h"
-
+#include "Miner.h"
 using namespace std;
 
 // Static member initialization
@@ -10,7 +10,7 @@ Node::Node(const char* db_name) {
         login_check = false;
         throw runtime_error("Can't open database: " + string(sqlite3_errmsg(db)));
     }
-} 
+}
 
 Node::~Node() {
     sqlite3_close(db);
@@ -36,7 +36,7 @@ bool Node::sign_transaction(string key)
         }
     }
     return true;
-   
+
 }
 
 Node::Node(string un, string pubk, string prik, double w, int dif, string iden)
@@ -89,11 +89,11 @@ bool Node::set_values_to_attributes(const string& usern, const string& pass) {
     }
     rc = sqlite3_step(stmnt);
     if (rc == SQLITE_ROW) {
-       this->username = usern;
-       this->public_key = reinterpret_cast<const char*>(sqlite3_column_text(stmnt, 0));
-       this->private_key = reinterpret_cast<const char*>(sqlite3_column_text(stmnt, 1));
-       this->wallet = sqlite3_column_double(stmnt, 2);
-       this->difficulty = sqlite3_column_int(stmnt, 3);
+        this->username = usern;
+        this->public_key = reinterpret_cast<const char*>(sqlite3_column_text(stmnt, 0));
+        this->private_key = reinterpret_cast<const char*>(sqlite3_column_text(stmnt, 1));
+        this->wallet = sqlite3_column_double(stmnt, 2);
+        this->difficulty = sqlite3_column_int(stmnt, 3);
 
         sqlite3_finalize(stmnt);
         return true;
@@ -264,8 +264,39 @@ bool Node::view_chain() {
     }
 
     return true;
-}double Node::get_wallet_balance() {
-    return wallet;
+}
+
+double Node::get_wallet_balance() {
+
+    double walletBalance = 0.0;
+    int rc;
+    sqlite3_stmt* stmt;
+    string get_balance = "SELECT wallet_balance FROM nodes WHERE username = '" + username + "';";
+
+    rc = sqlite3_prepare_v2(db, get_balance.c_str(), -1, &stmt, nullptr);
+    if (rc != SQLITE_OK)
+    {
+        cout << "Error preparing get_balance statement: " << sqlite3_errmsg(db) << endl;
+        return walletBalance; // Return 0.0 on error
+    }
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW)
+    {
+        walletBalance = sqlite3_column_double(stmt, 0);
+    }
+    else if (rc == SQLITE_DONE)
+    {
+        cout << "No wallet balance found for username: " << username << endl;
+    }
+    else
+    {
+        cout << "Error fetching wallet balance: " << sqlite3_errmsg(db) << endl;
+    }
+
+    sqlite3_finalize(stmt);
+    return walletBalance;
+
 }
 
 bool Node::login(string username, string password) {
@@ -275,8 +306,8 @@ bool Node::login(string username, string password) {
     // Prepare the SQL statement
     string query = "SELECT password FROM nodes WHERE username = ?";
 
-    rc = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt,nullptr);
-    if (rc != SQLITE_OK) 
+    rc = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, nullptr);
+    if (rc != SQLITE_OK)
     {
         cerr << "Failed to prepare statement: " << sqlite3_errmsg(db) << endl;
         sqlite3_finalize(stmt);
@@ -293,7 +324,7 @@ bool Node::login(string username, string password) {
 
     // Execute the SQL statement
     rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW){
+    if (rc == SQLITE_ROW) {
         // Username exists, check if password matches
         string stored_password = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
         if (password == stored_password) {
@@ -306,7 +337,7 @@ bool Node::login(string username, string password) {
             return true;
         }
 
-        else 
+        else
         {
             // Password doesn't match, close database and return false
             cerr << "Incorrect password" << endl;
@@ -541,7 +572,7 @@ bool Node::send_money(string receiver_username, double amount, string privKey) {
     char ynchoice;
     cin >> ynchoice;
     if (ynchoice == 'Y' || ynchoice == 'y') {
-        
+
         sqlite3_finalize(stmt); // Finalize SELECT statement
 
         // Begin transaction or sign transaction
@@ -558,13 +589,15 @@ bool Node::send_money(string receiver_username, double amount, string privKey) {
         }
 
         // Prepare and bind parameters for transaction queries
-        string transaction_query1 =
+        /*string transaction_query1 =
             "UPDATE nodes SET wallet_balance = wallet_balance - " + to_string(amount) + " WHERE username = '" + username + "';";
         string transaction_query2 =
-            "UPDATE nodes SET wallet_balance = wallet_balance + " + to_string(amount) + " WHERE username = '" + receiver_username + "';";
+            "UPDATE nodes SET wallet_balance = wallet_balance + " + to_string(amount) + " WHERE username = '" + receiver_username + "';";*/
+
         string transaction_query3 =
             "UPDATE notifications SET numberOfNotifications = numberOfNotifications + 1 WHERE node_id = (SELECT id FROM nodes WHERE username = '" + receiver_username + "');";
-        rc = sqlite3_exec(db, transaction_query1.c_str(), nullptr, nullptr, nullptr);
+
+        /* rc = sqlite3_exec(db, transaction_query1.c_str(), nullptr, nullptr, nullptr);
 
         if (rc != SQLITE_OK) {
             cerr << "Failed to Update Sender's Wallet: " << sqlite3_errmsg(db) << endl;
@@ -578,7 +611,7 @@ bool Node::send_money(string receiver_username, double amount, string privKey) {
             cerr << "Failed to Update Reciever's Wallet: " << sqlite3_errmsg(db) << endl;
             sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
             return false;
-        }
+        }*/
 
         rc = sqlite3_exec(db, transaction_query3.c_str(), nullptr, nullptr, nullptr);
 
@@ -634,36 +667,35 @@ bool Node::send_money(string receiver_username, double amount, string privKey) {
             return false;
         }
 
-        // Get the latest transaction ID
-        const char* query_trans_id = "SELECT id FROM transactions ORDER BY id DESC LIMIT 1";
-        rc = sqlite3_prepare_v2(db, query_trans_id, -1, &stmt, nullptr);
-        if (rc != SQLITE_OK) {
-            cerr << "Failed to prepare statement: " << sqlite3_errmsg(db) << endl;
-            return false;
-        }
+        //// Get the latest transaction ID
+        //const char* query_trans_id = "SELECT id FROM transactions ORDER BY id DESC LIMIT 1";
+        //rc = sqlite3_prepare_v2(db, query_trans_id, -1, &stmt, nullptr);
+        //if (rc != SQLITE_OK) {
+        //    cerr << "Failed to prepare statement: " << sqlite3_errmsg(db) << endl;
+        //    return false;
+        //}
 
-        int latest_id = -1;
-        rc = sqlite3_step(stmt);
-        if (rc == SQLITE_ROW) {
-            latest_id = sqlite3_column_int(stmt, 0);
-        }
-        else if (rc != SQLITE_DONE) {
-            cerr << "Process failed: " << sqlite3_errmsg(db) << endl;
-            sqlite3_finalize(stmt);
-            return false;
-        }
-        sqlite3_finalize(stmt); // Finalize SELECT statement
+        //int latest_id = -1;
+        //rc = sqlite3_step(stmt);
+        //if (rc == SQLITE_ROW) {
+        //    latest_id = sqlite3_column_int(stmt, 0);
+        //}
+        //else if (rc != SQLITE_DONE) {
+        //    cerr << "Process failed: " << sqlite3_errmsg(db) << endl;
+        //    sqlite3_finalize(stmt);
+        //    return false;
+        //}
+        //sqlite3_finalize(stmt); // Finalize SELECT statement
 
-        //Create and commit the block
-        Block block(latest_id, db);
-        //cout << "debug print before commiting block in send_money" << endl;
-        if (!block.commit_block()) {
-            cout << "Failed to add block to the chain" << endl;
-            return false;
-        }
+        ////Create and commit the block
+        //Block block(latest_id, db);
+        ////cout << "debug print before commiting block in send_money" << endl;
+        //if (!block.commit_block()) {
+        //    cout << "Failed to add block to the chain" << endl;
+        //    return false;
+        //}
 
         // //Update wallet balance in memory if transaction succeeded
-        wallet -= amount;
         return true;
 
     }
@@ -673,7 +705,7 @@ bool Node::send_money(string receiver_username, double amount, string privKey) {
         return false;
 
     }
-    
+
 }
 
 bool  Node::set_notfications() {
@@ -715,7 +747,7 @@ bool  Node::set_notfications() {
     // Finalize the statement
     sqlite3_finalize(stmt);
     return true;
-   
+
 }
 
 
@@ -738,7 +770,7 @@ bool  Node::reset_notfications() {
         cout << "error binding username for reset notifications: " << string(sqlite3_errmsg(db)) << endl;
         return false;
     }
-    
+
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
         cerr << "Failed to execute reset notifications statement: " << sqlite3_errmsg(db) << endl;
@@ -759,7 +791,7 @@ bool Node::get_notifications() {
     int rc;
     sqlite3_stmt* stmt;
     map<string, vector<string>> history;
-    string get_transactions = "SELECT sender, reciever, amount FROM transactions WHERE reciever = ? ORDER BY id DESC LIMIT " + to_string(notifications) + " ;";
+    string get_transactions = "SELECT sender, reciever, amount FROM transactions WHERE AND reciever = ? ORDER BY id DESC LIMIT " + to_string(notifications) + " ;";
 
     rc = sqlite3_prepare_v2(db, get_transactions.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK)
@@ -837,23 +869,23 @@ bool Node::get_notifications() {
         }
         cout << endl;
     }
-    
+
     Node::reset_notfications();
 
     return true;
 }
 
-bool Node::approve_block(int block_id) {
+bool Node::approve_transaction(int transaction_id) {
 
     int rc;
     sqlite3_stmt* stmt;
     int approvedvalue = 1;
-    string approveBlockQuery = "UPDATE node_approvals SET approve = 1 WHERE node_id = (SELECT id FROM nodes WHERE username = '" + username + "') AND block_id = " + to_string(block_id) + ";";
-    
-    rc = sqlite3_prepare_v2(db, approveBlockQuery.c_str(), -1, &stmt, nullptr); 
+    string approveTransactionQuery = "UPDATE node_approvals SET approve = 1 WHERE node_id = (SELECT id FROM nodes WHERE username = '" + username + "') AND transaction_id = " + to_string(transaction_id) + ";";
+
+    rc = sqlite3_prepare_v2(db, approveTransactionQuery.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
         cout << "statement prep error\n";
-        cout << "Error preparing block approval query: " << sqlite3_errmsg(db) << endl;
+        cout << "Error preparing transaction approval query: " << sqlite3_errmsg(db) << endl;
         return false;
     }
 
@@ -874,16 +906,21 @@ bool Node::approve_block(int block_id) {
     //    return false;
     //}
 
-    rc = sqlite3_step(stmt); 
+    rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
         cout << "statemet exeuteon error\n";
-        std::cerr << "Error Approving Block : " << sqlite3_errmsg(db) << std::endl;
+        std::cerr << "Error Approving Transaction : " << sqlite3_errmsg(db) << std::endl;
         sqlite3_finalize(stmt);
         return false;
     }
 
-    cout << "\nApproved Block with Block ID : " << block_id << endl;
+    cout << "\nApproved Transaction with Transaction ID : " << transaction_id << endl;
     sqlite3_finalize(stmt);
+
+    CPU_Miner miner("Miner", 500, 8);
+    miner.checkPendingTransactions(db);
+
+
     return true;
 
 }
@@ -892,9 +929,9 @@ bool Node::view_pending_approvals() {
     int rc;
     sqlite3_stmt* stmt;
 
-    string get_pending_approvals = "SELECT block_id  FROM node_approvals WHERE node_id = (SELECT id from nodes WHERE username = ? ) AND approve = 0 ;";
+    string get_pending_approvals = "SELECT transaction_id FROM node_approvals WHERE node_id = (SELECT id from nodes WHERE username = ? ) AND approve = 0 ;";
 
-    rc = sqlite3_prepare_v2(db, get_pending_approvals.c_str(), -1, &stmt, nullptr); 
+    rc = sqlite3_prepare_v2(db, get_pending_approvals.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK)
     {
         cout << "error preparing get_pending_approvals statement: " << string(sqlite3_errmsg(db)) << endl;
@@ -915,11 +952,11 @@ bool Node::view_pending_approvals() {
         hasPendingApprovals = true; // Set the flag to true if at least one row is returned
 
         // Get the block_id and approved status from the result
-        int block_id = sqlite3_column_int(stmt, 0);
+        int transaction_id = sqlite3_column_int(stmt, 0);
         int approved = sqlite3_column_int(stmt, 1);
 
         // Print the block_id and its approval status
-        cout << "\nBlock ID: " << block_id << ", Approval Status: " << (approved ? "true" : "false");
+        cout << "\nTransaction ID: " << transaction_id << ", Approval Status: " << (approved ? "true" : "false");
     }
 
     // Check the flag after the loop

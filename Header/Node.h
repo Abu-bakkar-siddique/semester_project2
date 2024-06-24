@@ -113,6 +113,6 @@ public:
     bool set_notfications(); // UPDATE : Method for Setting Notifications
     bool reset_notfications(); // UPDATE : Method for Updating Notifications in the DB
     bool get_notifications();  // UPDATE : Method for Getting Notifications from the DB
-    bool approve_block(int block_id);
+    bool approve_transaction(int transaction_id);
     bool view_pending_approvals();
 };

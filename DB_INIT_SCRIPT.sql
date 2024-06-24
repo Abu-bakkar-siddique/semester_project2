@@ -6,30 +6,29 @@ CREATE TABLE blockchain (
     FOREIGN KEY (hash) REFERENCES blocks(block_hash)
 )
 
-CREATE TABLE blocks
-(
+CREATE TABLE "blocks" (
     id INTEGER PRIMARY KEY,
     previous_block_hash TEXT,
     block_hash TEXT NOT NULL,
-    transaction_id INTEGER NOT NULL UNIQUE  ,
-    time_stamp DATETIME DEFAULT CURRENT_TIMESTAMP, approved INTEGER DEFAULT 0 CHECK (approved IN (0, 1)), 
-    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+    transaction_id INTEGER NOT NULL UNIQUE,
+    time_stamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(transaction_id) REFERENCES transactions(id)
 )
 
-CREATE TABLE miners (
-    miner_id INTEGER,
-    wallet_balance REAL NOT NULL,
-    FOREIGN KEY (miner_id) REFERENCES nodes(id),
-    FOREIGN KEY (wallet_balance) REFERENCES nodes(wallet_balance)
+CREATE TABLE "miners" (
+	"miner_id"	INTEGER,
+	"wallet_balance"	REAL NOT NULL,
+	FOREIGN KEY("wallet_balance") REFERENCES "nodes"("wallet_balance")
 )
 
 CREATE TABLE "node_approvals" (
-    id INTEGER PRIMARY KEY,
-    node_id INT,
-    block_id INT,
-    approve INT DEFAULT 0 CHECK (approve IN (0, 1)),
-    FOREIGN KEY (node_id) REFERENCES nodes(id),
-    FOREIGN KEY (block_id) REFERENCES blocks(id)
+	"id"	INTEGER,
+	"node_id"	INT,
+	"transaction_id"	INT,
+	"approve"	INT DEFAULT 0 CHECK("approve" IN (0, 1)),
+	FOREIGN KEY("node_id") REFERENCES "nodes"("id"),
+	FOREIGN KEY("transaction_id") REFERENCES "transactions"("id"),
+	PRIMARY KEY("id")
 )
 
 CREATE TABLE nodes
@@ -49,44 +48,37 @@ CREATE TABLE notifications (
     FOREIGN KEY (node_id) REFERENCES nodes(id)
 )
 
-CREATE TABLE sqlite_sequence(name,seq)
-
 CREATE TABLE transactions
 (
     id INTEGER PRIMARY KEY,
     sender TEXT NOT NULL,       
     reciever TEXT NOT NULL,
-    amount REAL NOT NULL,
+    amount REAL NOT NULL, approved INTEGER DEFAULT 0 CHECK (approved IN (0, 1)),
     FOREIGN KEY(sender) REFERENCES nodes(username),
     FOREIGN KEY(reciever) REFERENCES nodes(username)
 )
 
-CREATE TRIGGER check_block_approval_after_update
-AFTER UPDATE ON node_approvals
-FOR EACH ROW
+CREATE TRIGGER insert_node_approvals_after_transaction_insert
+AFTER INSERT ON transactions
 BEGIN
-UPDATE blocks
-SET approved = (
-    SELECT COUNT() >= (SELECT COUNT() FROM nodes) / 2
-    FROM node_approvals
-    WHERE block_id = NEW.block_id AND approved = TRUE
-)
-WHERE id = NEW.block_id;
-END
-
-CREATE TRIGGER insert_node_approvals_after_block_insert
-AFTER INSERT ON blocks
-BEGIN
-    INSERT INTO node_approvals (node_id, block_id, approve)
-    SELECT id AS node_id, NEW.id AS block_id, 0 AS approve
+    INSERT INTO node_approvals (node_id, transaction_id, approve)
+    SELECT id AS node_id, NEW.id AS transaction_id, 0 AS approve
     FROM nodes;
 END
 
-
-
-INSERT DUMMY BLOCKS
-
-GENESIS BLOCK : 
-INSERT INTO blocks (previous_block_hash, block_hash, transaction_id)
-VALUES (NULL, '445534234255', 1);
+CREATE TRIGGER update_receiver_wallet_balance
+AFTER UPDATE OF approved ON transactions
+FOR EACH ROW
+WHEN NEW.approved = 1
+BEGIN
+    -- Update receiver's wallet balance
+    UPDATE nodes
+    SET wallet_balance = wallet_balance + (SELECT amount FROM transactions WHERE id = NEW.id)
+    WHERE username = new.reciever;
+	
+    -- Update sender's wallet balance
+    UPDATE nodes
+    SET wallet_balance = wallet_balance - (SELECT amount FROM transactions WHERE id = NEW.id)
+    WHERE username = new.sender;
+END
 

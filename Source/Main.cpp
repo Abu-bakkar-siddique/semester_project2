@@ -56,7 +56,7 @@ int main() {
     const char* db_name = "D:/Uni/2nd Semester/Oop Project/Updated@21Jun/semesterProject2/Project/Project/dbb.db"; // Replace with the absolute path to your db;
     Node node(db_name);
     Blockchain blockchain(db_name);
-    Miner* cpuMiner = new CPU_Miner("CPU Miner", 100, 4);
+    CPU_Miner cpuMiner("CPU Miner", 100, 4);
     Miner* gpuMiner = new GPU_Miner("GPU Miner", 200, 2);
 
     string username, password;
@@ -131,7 +131,7 @@ int main() {
                     cout << "[3]  Send Money\n";
                     cout << "[4]  View Wallet\n";
                     cout << "[5]  View Notifications\n";
-                    cout << "[6]  Approve Blocks\n";
+                    cout << "[6]  Approve Transactions\n";
                     cout << "[7]  Logout\n";
                     cout << "Enter your choice: ";
                     cin >> option;
@@ -168,7 +168,7 @@ int main() {
 
                         if (node.send_money(receiver_username, amount,node.getPrivateKey())) {
 
-                            cpuMiner->mine();
+                            cpuMiner.mine();
                             cout << ".";
                             this_thread::sleep_for(chrono::seconds(1));
                             cout << ".";
@@ -229,13 +229,13 @@ int main() {
                         if (node.view_pending_approvals() == true) {
                             cout << "\n..........................................................................\n";
                             cout << "\nEnter the Block ID you want to Approve or Enter 0 to Exit: ";
-                            int blocktoapprove = -1;
-                            while (blocktoapprove != 0) {
-                                cin >> blocktoapprove;
-                                if (blocktoapprove == 0) {
+                            int transactiontoapprove = -1;
+                            while (transactiontoapprove != 0) {
+                                cin >> transactiontoapprove;
+                                if (transactiontoapprove == 0) {
                                     break;
                                 }
-                                if (node.approve_block(blocktoapprove) == true) {
+                                if (node.approve_transaction(transactiontoapprove) == true) {
                                     cout << "\nBlock Approved Successfully";
                                     goto refresh;
                                 }
@@ -273,7 +273,6 @@ int main() {
         }
         case 3:
             cout << "Exiting...\n";
-            delete cpuMiner;
             delete gpuMiner;
             return 0;
         default:
